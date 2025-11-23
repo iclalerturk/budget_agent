@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.py[cod]
+.env
+venv/
+.env/
+.venv/
+
+# Logs
+*.log
+
+# VSCode
+.vscode/
+
+# Node.js
+node_modules/
+dist/
+package-lock.json
+
+# Others
+.DS_Store

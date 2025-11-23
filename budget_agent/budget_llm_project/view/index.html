@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Minimal Chat UI</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    /* --- Body genel ayarları --- */
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      background: linear-gradient(to bottom, #f8fafc, #f1f5f9); /* degrade arka plan */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh; /* ekranın tamamını kaplasın */
+      
+    }
+    
+
+    /* --- Sohbet kutusu --- */
+    .chat-box {
+      width: 100%;
+      max-width: 800px;   /* genişlik sınırı */
+      height: 90vh;       /* ekranın %90 yüksekliği */
+      background: #fff;
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1); /* gölge efekti */
+      overflow: hidden;
+    }
+
+    /* --- Üst başlık (header) --- */
+    .header {
+      padding: 12px 16px;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .header button {
+      background: #3b378c;
+      color: white;
+      border: none;
+      border-radius: 20px;
+      padding: 8px 16px;
+      cursor: pointer;
+    }
+    .header button:hover {
+      background: #4338ca;
+    }
+
+    /* --- Mesajların listelendiği alan --- */
+    .messages {
+      flex: 1; /* dikeyde boş alanı kaplasın */
+      padding: 16px;
+      overflow-y: auto; /* scrollbar aktif */
+      background: linear-gradient(to bottom, #fff, #f8fafc);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* --- Mesaj balonları --- */
+    .msg {
+      max-width: 75%;
+      padding: 10px 14px;
+      border-radius: 14px;
+      margin: 6px 0;
+      font-size: 14px;
+      line-height: 1.4;
+      white-space: pre-wrap; /* alt satırları koru */
+    }
+
+    /* Bot mesajı */
+    .msg.bot {
+      background: #fff;
+      border-left: 4px solid #c7d2fe;
+      align-self: flex-start;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+
+    /* Kullanıcı mesajı */
+    .msg.user {
+      background: #726cd6;
+      color: white;
+      align-self: flex-end;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+    }
+
+    /* --- Mesaj yazma alanı (composer) --- */
+    .composer {
+      display: flex;
+      gap: 8px;
+      padding: 12px;
+      border-top: 1px solid #e2e8f0;
+      background: #fff;
+    }
+    .composer textarea {
+      flex: 1;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid #cbd5e1;
+      resize: none;       /* boyut değiştirme kapalı */
+      min-height: 40px;
+      max-height: 120px;
+    }
+    .composer button {
+      background: #3b378c;
+      color: white;
+      border: none;
+      border-radius: 20px;
+      padding: 8px 16px;
+      cursor: pointer;
+    }
+    .composer button:hover {
+      background: #4338ca;
+    }
+
+    /* --- Loading animasyonu için 3 nokta yanıp sönme --- */
+    @keyframes blink {
+      0%, 20%, 50%, 80%, 100% { opacity: 0; }
+      10%, 30%, 60%, 90% { opacity: 1; }
+    }
+    .loading-dots span { display: inline-block; animation: blink 1.4s infinite; }
+    .loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+    #loading {
+      font-size: 40px;
+      color: #64748b;
+      min-height: 18px;
+      margin-left: 10px;
+      margin-bottom: 5px;
+      background: linear-gradient(to bottom, #f8fafc, #f1f5f9);
+    }
+    
+  </style>
+</head>
+<body>
+  <script src="config.js"></script>
+  <div class="chat-box">
+    <!-- Üst başlık -->
+    <div class="header">
+      <div>
+        <strong>Bütçe Asistanı</strong>
+        <div style="font-size:12px;color:#64748b">Budget chat arayüzü</div>
+      </div>
+      <button onclick="clearChat()">Yeni Chat</button>
+    </div>
+
+    <!-- Mesajlar burada listeleniyor -->
+    <div class="messages" id="messages"></div>
+
+    <!-- Bot cevap beklerken loading animasyonu -->
+    <div id="loading" class="loading-dots" style="display:none;"></div>
+
+    <!-- Mesaj yazma alanı -->
+    <div class="composer">
+      <textarea id="input" placeholder="Mesaj yaz..."></textarea>
+      <button onclick="sendMessage()">Gönder</button>
+    </div>
+  </div>
+
+  <script>
+    // HTML elemanlarını değişkenlere atıyoruz
+    const messagesEl = document.getElementById('messages');
+    const inputEl = document.getElementById('input');
+    const loadingEl = document.getElementById('loading');
+
+    // Tüm mesajları tutacak dizi
+    const messages = [];
+
+    // --- Mesajları ekrana basma fonksiyonu ---
+    function renderMessages() {
+      messagesEl.innerHTML = '';
+      messages.forEach(m => {
+        const div = document.createElement('div');
+        div.className = 'msg ' + m.from; // user veya bot
+        div.textContent = m.text;
+        messagesEl.appendChild(div);
+      });
+      messagesEl.scrollTop = messagesEl.scrollHeight; // her zaman en sona kay
+    }
+
+    // --- Loading göster ---
+    function showLoading() {
+      loadingEl.innerHTML = '<span>.</span><span>.</span><span>.</span>';
+      loadingEl.style.display = 'block';
+    }
+
+    // --- Loading gizle ---
+    function hideLoading() {
+      loadingEl.style.display = 'none';
+    }
+
+    // --- Mesaj gönderme fonksiyonu ---
+    async function sendMessage() {
+      const text = inputEl.value.trim();
+      if (!text) return; // boş mesaj gönderme
+
+      // Kullanıcı mesajını ekle
+      messages.push({ from: 'user', text });
+      renderMessages();
+      inputEl.value = '';
+      showLoading();
+
+      // Backend için benzersiz session_id üret
+      const sessionId = crypto.randomUUID();
+
+      try {
+        // FastAPI sunucusuna POST isteği at
+        const res = await fetch(`${CONFIG.API_BASE}/query`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            question: text,       // kullanıcının sorusu
+            session_id: sessionId // rastgele oturum kimliği
+          })
+        });
+
+        if (!res.ok) throw new Error('Sunucu hatası');
+
+        const data = await res.json();
+
+        hideLoading();
+
+        // Bot cevabını ekle
+        messages.push({ from: 'bot', text: data.answer || '(cevap yok)' });
+        renderMessages();
+      } catch (err) {
+        // Hata olursa kullanıcıya bildir
+        hideLoading();
+        messages.push({ from: 'bot', text: 'Hata: ' + err.message });
+        renderMessages();
+      }
+    }
+
+    // --- Yeni chat başlat (mesajları temizle) ---
+    function clearChat() {
+      messages.length = 0;
+      renderMessages();
+    }
+
+    // Enter tuşu ile mesaj gönderme (Shift+Enter yeni satır açar)
+    inputEl.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    // Başlangıçta botun karşılama mesajı
+    messages.push({ from: 'bot', text: 'Merhaba! Sana nasıl yardımcı olabilirim?' });
+    renderMessages();
+  </script>
+</body>
+</html>

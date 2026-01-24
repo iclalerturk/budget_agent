@@ -43,3 +43,4 @@ src/
 pip install -r requirements.txt
 python main.py
 ```
+![Screenshot_20260124_215554_Canva](https://github.com/user-attachments/assets/775fa5f4-6997-4611-94c3-c4db31fc703c)
